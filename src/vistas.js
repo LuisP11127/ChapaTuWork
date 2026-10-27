@@ -1,6 +1,6 @@
 import { RUBROS, MODALIDADES, TIPOS, buscarRubro } from "./catalogo.js";
 import { POR_PAGINA } from "./db.js";
-import { esc, haceCuanto, plural } from "./util.js";
+import { esc, haceCuanto, plural, textoCierre } from "./util.js";
 
 function layout({ titulo, descripcion, cuerpo, hayEjemplos = false }) {
   const tituloCompleto = titulo ? `${titulo} · ChapaTuWork` : "ChapaTuWork · Ofertas de trabajo en Perú";
@@ -51,6 +51,7 @@ function tarjeta(o) {
   const rubro = buscarRubro(o.rubro) ?? buscarRubro("otros");
   const lugar = [o.empresa, o.ubicacion ?? o.departamento].filter(Boolean).map(esc).join(" · ");
   const etiquetas = [MODALIDADES[o.modalidad], TIPOS[o.tipo], o.salario].filter(Boolean);
+  const cierre = textoCierre(o.cierra_en);
   return `<article class="oferta">
   <div class="oferta-cab">
     <a class="rubro" href="/rubro/${rubro.slug}">${esc(rubro.nombre)}</a>
@@ -60,7 +61,7 @@ function tarjeta(o) {
   ${lugar ? `<p class="lugar">${lugar}</p>` : ""}
   ${o.resumen ? `<p class="resumen">${esc(o.resumen)}</p>` : ""}
   <div class="oferta-pie">
-    <ul class="etiquetas">${etiquetas.map((e) => `<li>${esc(e)}</li>`).join("")}${o.fuente === "ejemplo" ? `<li class="ejemplo">Ejemplo</li>` : ""}</ul>
+    <ul class="etiquetas">${cierre ? `<li class="cierre${cierre.urgente ? " urgente" : ""}">${esc(cierre.texto)}</li>` : ""}${etiquetas.map((e) => `<li>${esc(e)}</li>`).join("")}${o.fuente === "ejemplo" ? `<li class="ejemplo">Ejemplo</li>` : ""}</ul>
     <a class="boton" href="/ir/${o.id}" target="_blank" rel="noopener nofollow">Más información <span aria-hidden="true">↗</span></a>
   </div>
 </article>`;

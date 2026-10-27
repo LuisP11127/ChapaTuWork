@@ -20,6 +20,22 @@ export function haceCuanto(iso, ahora = Date.now()) {
   return fecha.toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Fecha de hoy en Lima (UTC-5), como AAAA-MM-DD.
+export function hoyEnLima(ahora = Date.now()) {
+  return new Date(ahora - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+// cierra_en viene como AAAA-MM-DD. Devuelve null si no hay fecha.
+export function textoCierre(cierraEn, ahora = Date.now()) {
+  if (!cierraEn) return null;
+  const dias = Math.round((Date.parse(cierraEn) - Date.parse(hoyEnLima(ahora))) / DIA);
+  if (Number.isNaN(dias)) return null;
+  if (dias <= 0) return { texto: "Cierra hoy", urgente: true };
+  if (dias === 1) return { texto: "Cierra mañana", urgente: true };
+  const fecha = new Date(`${cierraEn}T12:00:00Z`).toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+  return { texto: `Cierra el ${fecha}`, urgente: false };
+}
+
 export function plural(n, singular, pluralForma) {
   return `${n.toLocaleString("es-PE")} ${n === 1 ? singular : pluralForma}`;
 }

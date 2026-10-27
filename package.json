@@ -5,7 +5,8 @@
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 migrations apply chapatuwork --remote",
     "db:migrate:local": "wrangler d1 migrations apply chapatuwork --local",
-    "db:ejemplos:local": "wrangler d1 execute chapatuwork --local --file seed/ejemplos.sql"
+    "db:ejemplos:local": "wrangler d1 execute chapatuwork --local --file seed/ejemplos.sql",
+    "importar": "node scripts/importar-csv.mjs"
   },
   "repository": {
     "type": "git",

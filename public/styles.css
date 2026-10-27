@@ -275,6 +275,17 @@ button:hover, .boton:hover { filter: brightness(1.08); }
   font-size: 0.85rem;
 }
 
+.etiquetas li.cierre {
+  border-color: var(--acento);
+  color: var(--acento);
+  font-weight: 600;
+}
+
+.etiquetas li.cierre.urgente {
+  background: var(--acento);
+  color: var(--acento-texto);
+}
+
 .etiquetas li.ejemplo {
   border-color: transparent;
   background: var(--aviso);

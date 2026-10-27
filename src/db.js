@@ -1,8 +1,15 @@
 export const POR_PAGINA = 20;
 
+// Una oferta se muestra hasta su fecha de cierre (hora de Lima). Si no tiene
+// fecha de cierre, se muestra durante 30 días desde que se publicó.
+const VIGENTE = `activo = 1 AND (CASE
+  WHEN cierra_en IS NOT NULL THEN cierra_en >= date('now', '-5 hours')
+  ELSE publicado_en >= date('now', '-5 hours', '-30 days')
+END)`;
+
 // Arma el WHERE a partir de filtros ya validados (ver leerFiltros en index.js).
 function condiciones(f) {
-  const cond = ["activo = 1"];
+  const cond = [VIGENTE];
   const params = [];
   if (f.rubro) {
     cond.push("rubro = ?");
@@ -41,8 +48,8 @@ export async function listarOfertas(db, filtros, pagina) {
 
 export async function datosInicio(db) {
   const [porRubro, recientes] = await db.batch([
-    db.prepare("SELECT rubro, COUNT(*) AS n FROM ofertas WHERE activo = 1 GROUP BY rubro"),
-    db.prepare("SELECT * FROM ofertas WHERE activo = 1 ORDER BY publicado_en DESC, id DESC LIMIT 8"),
+    db.prepare(`SELECT rubro, COUNT(*) AS n FROM ofertas WHERE ${VIGENTE} GROUP BY rubro`),
+    db.prepare(`SELECT * FROM ofertas WHERE ${VIGENTE} ORDER BY publicado_en DESC, id DESC LIMIT 8`),
   ]);
   const conteo = Object.fromEntries(porRubro.results.map((r) => [r.rubro, r.n]));
   const total = porRubro.results.reduce((s, r) => s + r.n, 0);
@@ -51,7 +58,7 @@ export async function datosInicio(db) {
 
 export async function listarDepartamentos(db) {
   const { results } = await db
-    .prepare("SELECT DISTINCT departamento FROM ofertas WHERE activo = 1 AND departamento IS NOT NULL ORDER BY departamento")
+    .prepare(`SELECT DISTINCT departamento FROM ofertas WHERE ${VIGENTE} AND departamento IS NOT NULL ORDER BY departamento`)
     .all();
   return results.map((r) => r.departamento);
 }
