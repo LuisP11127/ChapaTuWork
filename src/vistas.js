@@ -12,12 +12,14 @@ function layout({ titulo, descripcion, cuerpo, hayEjemplos = false }) {
   <title>${esc(tituloCompleto)}</title>
   <meta name="description" content="${esc(descripcion ?? "Ofertas de trabajo en todo el Perú, ordenadas por rubro.")}">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#d9480f">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="topbar">
     <div class="wrap topbar-in">
-      <a class="logo" href="/">Chapa<span>Tu</span>Work</a>
+      <a class="logo" href="/"><img src="/logo.svg" alt="" width="32" height="32"><span>Chapa<b>Tu</b>Work</span></a>
       <nav class="nav">
         <a href="/empleos">Empleos</a>
         <a href="/#rubros">Rubros</a>
