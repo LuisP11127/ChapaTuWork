@@ -1,0 +1,23 @@
+{
+  "name": "chapatuwork",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply chapatuwork --remote",
+    "db:migrate:local": "wrangler d1 migrations apply chapatuwork --local",
+    "db:ejemplos:local": "wrangler d1 execute chapatuwork --local --file seed/ejemplos.sql"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LuisP11127/ChapaTuWork.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LuisP11127/ChapaTuWork/issues"
+  },
+  "homepage": "https://github.com/LuisP11127/ChapaTuWork#readme",
+  "devDependencies": {
+    "wrangler": "^4.154.0"
+  },
+  "private": true,
+  "type": "module"
+}
