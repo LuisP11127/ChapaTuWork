@@ -185,6 +185,15 @@ function salario(s) {
   return `S/ ${m[1]}${m[2] && m[2] !== ".00" ? m[2] : ""}`;
 }
 
+// Primer monto del texto, como número. null si no hay o si no es razonable
+// para un sueldo mensual (suelen ser errores como "S/ 001").
+function salarioNumero(s) {
+  const m = s.match(/(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, "") + (m[2] ?? ""));
+  return n >= 300 && n <= 30000 ? n : null;
+}
+
 // Talento Perú publica el resumen como "Convocatoria <régimen>-<n.°> para
 // <PUESTO>; <n> vacante en <ENTIDAD>." El puesto y la entidad ya se muestran
 // aparte, así que se deja solo el régimen, el número y las vacantes.
@@ -285,7 +294,13 @@ function principal() {
       fila.resumen = talento.resumen;
       if (!fila.tipo && talento.temporal) fila.tipo = "temporal";
     }
+    // Si el texto trae un monto pero no es razonable, no se muestra.
+    if (/\d/.test(fila.salario) && salarioNumero(fila.salario) === null) {
+      avisar(`salario "${fila.salario}" no parece un sueldo mensual; se deja vacío`, linea);
+      fila.salario = "";
+    }
     fila.texto_busqueda = textoBuscable(fila.titulo, fila.empresa, fila.ubicacion, fila.resumen);
+    fila.salario_num = salarioNumero(fila.salario);
     if (fila.cierra_en && fila.cierra_en < hoy) {
       avisar("Se omite: la fecha de cierre ya pasó", linea);
       return;
@@ -294,7 +309,7 @@ function principal() {
   });
 
   // D1 limita el tamaño de cada sentencia, así que se inserta por lotes.
-  const campos = ["fuente", "fuente_id", "titulo", "empresa", "ubicacion", "departamento", "rubro", "modalidad", "tipo", "salario", "resumen", "url_postulacion", "publicado_en", "cierra_en", "texto_busqueda"];
+  const campos = ["fuente", "fuente_id", "titulo", "empresa", "ubicacion", "departamento", "rubro", "modalidad", "tipo", "salario", "resumen", "url_postulacion", "publicado_en", "cierra_en", "texto_busqueda", "salario_num"];
   const actualizar = campos.filter((c) => !["fuente", "fuente_id"].includes(c)).map((c) => `${c} = excluded.${c}`);
   const salida = [];
   if (opciones.includes("--sin-ejemplos")) salida.push("DELETE FROM ofertas WHERE fuente = 'ejemplo';");

@@ -9,6 +9,13 @@ const VIGENTE = `activo = 1 AND (CASE
   ELSE publicado_en >= date('now', '-5 hours', '-30 days')
 END)`;
 
+// Atajos de la portada y del listado. Fechas en hora de Lima: "cierran pronto"
+// es hoy, mañana o pasado mañana; "nuevas", publicadas en los últimos 3 días.
+const PROMEDIO = `(SELECT AVG(salario_num) FROM ofertas WHERE ${VIGENTE} AND salario_num IS NOT NULL)`;
+const SUELDO_ALTO = `salario_num > ${PROMEDIO}`;
+const CIERRA_PRONTO = `cierra_en IS NOT NULL AND cierra_en <= date('now', '-5 hours', '+2 days')`;
+const NUEVA = `publicado_en >= date('now', '-5 hours', '-2 days')`;
+
 // Arma el WHERE a partir de filtros ya validados (ver leerFiltros en index.js).
 function condiciones(f) {
   const cond = [VIGENTE];
@@ -34,14 +41,23 @@ function condiciones(f) {
     cond.push("texto_busqueda LIKE ? ESCAPE '\\'");
     params.push(like);
   }
+  if (f.sueldo) cond.push(SUELDO_ALTO);
+  if (f.cierre) cond.push(CIERRA_PRONTO);
+  if (f.nuevas) cond.push(NUEVA);
   return { where: cond.join(" AND "), params };
+}
+
+function orden(f) {
+  if (f.cierre) return "cierra_en ASC, publicado_en DESC, id DESC";
+  if (f.sueldo) return "salario_num DESC, publicado_en DESC, id DESC";
+  return "publicado_en DESC, id DESC";
 }
 
 export async function listarOfertas(db, filtros, pagina) {
   const { where, params } = condiciones(filtros);
   const [lista, total] = await db.batch([
     db
-      .prepare(`SELECT * FROM ofertas WHERE ${where} ORDER BY publicado_en DESC, id DESC LIMIT ? OFFSET ?`)
+      .prepare(`SELECT * FROM ofertas WHERE ${where} ORDER BY ${orden(filtros)} LIMIT ? OFFSET ?`)
       .bind(...params, POR_PAGINA, (pagina - 1) * POR_PAGINA),
     db.prepare(`SELECT COUNT(*) AS n FROM ofertas WHERE ${where}`).bind(...params),
   ]);
@@ -56,6 +72,19 @@ export async function datosInicio(db) {
   const conteo = Object.fromEntries(porRubro.results.map((r) => [r.rubro, r.n]));
   const total = porRubro.results.reduce((s, r) => s + r.n, 0);
   return { conteo, total, recientes: recientes.results };
+}
+
+// Cuántas ofertas hay en cada atajo y el sueldo promedio (soles al mes).
+export function resumenAtajos(db) {
+  return db
+    .prepare(
+      `SELECT ${PROMEDIO} AS promedio,
+        COALESCE(SUM(CASE WHEN ${SUELDO_ALTO} THEN 1 ELSE 0 END), 0) AS sueldo,
+        COALESCE(SUM(CASE WHEN ${CIERRA_PRONTO} THEN 1 ELSE 0 END), 0) AS cierre,
+        COALESCE(SUM(CASE WHEN ${NUEVA} THEN 1 ELSE 0 END), 0) AS nuevas
+      FROM ofertas WHERE ${VIGENTE}`,
+    )
+    .first();
 }
 
 export async function listarDepartamentos(db) {

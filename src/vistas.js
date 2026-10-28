@@ -73,7 +73,7 @@ function listaOfertas(ofertas) {
   return `<div class="ofertas">${ofertas.map(tarjeta).join("\n")}</div>`;
 }
 
-export function paginaInicio({ conteo, total, recientes, departamentos }) {
+export function paginaInicio({ conteo, total, recientes, departamentos, atajos }) {
   const rubros = RUBROS.map((r) => {
     const n = conteo[r.slug] ?? 0;
     return `<a class="rubro-card${n ? "" : " vacio"}" href="/rubro/${r.slug}">
@@ -95,6 +95,7 @@ export function paginaInicio({ conteo, total, recientes, departamentos }) {
         <button type="submit">Buscar</button>
       </form>
       <p class="hero-total">${plural(total, "oferta disponible", "ofertas disponibles")}</p>
+      ${botonesAtajos({ atajos })}
     </div>
   </section>
 
@@ -114,6 +115,35 @@ export function paginaInicio({ conteo, total, recientes, departamentos }) {
   return layout({ cuerpo, hayEjemplos: recientes.some((o) => o.fuente === "ejemplo") });
 }
 
+// Botones rápidos debajo del total. Cada uno es un filtro que se puede combinar.
+const ATAJOS = [
+  { clave: "sueldo", valor: "alto", texto: "Sueldo mayor al promedio", titulo: "Ofertas con sueldo mayor al promedio" },
+  { clave: "cierre", valor: "pronto", texto: "Cierran pronto", titulo: "Cierran pronto" },
+  { clave: "nuevas", valor: "1", texto: "Nuevas", titulo: "Ofertas nuevas" },
+];
+
+function soles(n) {
+  return `S/ ${Math.round(n).toLocaleString("es-PE")}`;
+}
+
+function notaAtajo(a, atajos) {
+  if (a.clave === "sueldo") return atajos.promedio ? `Sueldo mayor a ${soles(atajos.promedio)} al mes, el promedio de las ofertas que publican sueldo.` : "";
+  if (a.clave === "cierre") return "Cierran hoy, mañana o pasado mañana.";
+  return "Publicadas en los últimos 3 días.";
+}
+
+// En la portada llevan al listado y muestran cuántas ofertas hay; en el
+// listado se activan o desactivan sobre los filtros actuales.
+function botonesAtajos({ atajos, base = "/empleos", filtros = null }) {
+  const botones = ATAJOS.map((a) => {
+    const activo = filtros?.[a.clave];
+    const href = filtros ? enlacePagina(base, { ...filtros, [a.clave]: activo ? "" : a.valor }, 1) : `/empleos?${a.clave}=${a.valor}`;
+    const extra = filtros ? (activo ? ` <span aria-hidden="true">×</span>` : "") : ` <span class="atajo-n">${atajos[a.clave].toLocaleString("es-PE")}</span>`;
+    return `<a class="atajo${activo ? " activo" : ""}" href="${esc(href)}" title="${esc(notaAtajo(a, atajos))}">${esc(a.texto)}${extra}</a>`;
+  });
+  return `<nav class="atajos" aria-label="Atajos">${botones.join("")}</nav>`;
+}
+
 function enlacePagina(base, filtros, pagina) {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(filtros)) if (v) params.set(k, v);
@@ -122,15 +152,21 @@ function enlacePagina(base, filtros, pagina) {
   return qs ? `${base}?${qs}` : base;
 }
 
-export function paginaListado({ filtros, rubroFijo, ofertas, total, pagina, departamentos }) {
+export function paginaListado({ filtros, rubroFijo, ofertas, total, pagina, departamentos, atajos }) {
   const rubro = rubroFijo ? buscarRubro(rubroFijo) : filtros.rubro ? buscarRubro(filtros.rubro) : null;
-  const titulo = rubro ? rubro.nombre : filtros.q ? `Resultados para “${filtros.q}”` : "Todas las ofertas";
+  const atajosActivos = ATAJOS.filter((a) => filtros[a.clave]);
+  const titulo = rubro
+    ? rubro.nombre
+    : filtros.q
+      ? `Resultados para “${filtros.q}”`
+      : (atajosActivos[0]?.titulo ?? "Todas las ofertas");
   const base = rubroFijo ? `/rubro/${rubroFijo}` : "/empleos";
   // En /rubro/:slug el rubro va en la ruta, no en la query.
   const filtrosUrl = rubroFijo ? { ...filtros, rubro: "" } : filtros;
   const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const hayFiltros = Object.values(filtros).some(Boolean);
-  const activos = Object.values(filtrosUrl).filter(Boolean).length;
+  // Solo cuenta los filtros del formulario; los atajos se ven aparte.
+  const activos = ["q", "rubro", "departamento", "modalidad", "tipo"].filter((k) => filtrosUrl[k]).length;
 
   const paginacion =
     paginas > 1
@@ -164,6 +200,7 @@ export function paginaListado({ filtros, rubroFijo, ofertas, total, pagina, depa
         <div class="filtros-acciones">
           <button type="submit">Aplicar</button>
           ${hayFiltros || rubroFijo ? `<a href="/empleos">Limpiar</a>` : ""}
+          ${atajosActivos.map((a) => `<input type="hidden" name="${a.clave}" value="${a.valor}">`).join("")}
         </div>
       </form>
     </details>
@@ -173,6 +210,8 @@ export function paginaListado({ filtros, rubroFijo, ofertas, total, pagina, depa
         ${rubro ? `<p class="migas"><a href="/#rubros">Rubros</a> /</p>` : ""}
         <h1>${esc(titulo)}</h1>
         <p class="total">${plural(total, "oferta", "ofertas")}</p>
+        ${botonesAtajos({ atajos, base, filtros: filtrosUrl })}
+        ${atajosActivos.map((a) => notaAtajo(a, atajos)).filter(Boolean).map((n) => `<p class="nota">${esc(n)}</p>`).join("")}
       </div>
       ${ofertas.length ? listaOfertas(ofertas) : `<p class="vacio-msg">No encontramos ofertas con esos filtros. Prueba quitando alguno.</p>`}
       ${paginacion}

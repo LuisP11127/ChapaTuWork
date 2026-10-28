@@ -170,6 +170,49 @@ button, .boton {
 
 button:hover, .boton:hover { filter: brightness(1.08); }
 
+/* Atajos: sueldo mayor al promedio, cierran pronto, nuevas */
+
+.atajos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.atajo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  color: var(--texto);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.atajo:hover { border-color: var(--acento); }
+
+.atajo-n {
+  color: var(--suave);
+  font-weight: 400;
+}
+
+.atajo.activo {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--acento-texto);
+}
+
+.nota {
+  margin: 8px 0 0;
+  color: var(--suave);
+  font-size: 0.9rem;
+}
+
 .seccion { padding-top: 40px; }
 
 .seccion h2 { font-size: 1.3rem; margin-bottom: 16px; }

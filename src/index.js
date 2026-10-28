@@ -1,5 +1,5 @@
 import { MODALIDADES, TIPOS, buscarRubro } from "./catalogo.js";
-import { datosInicio, listarDepartamentos, listarOfertas, sumarClic, urlDeOferta } from "./db.js";
+import { datosInicio, listarDepartamentos, listarOfertas, resumenAtajos, sumarClic, urlDeOferta } from "./db.js";
 import { pagina404, paginaError, paginaInicio, paginaListado } from "./vistas.js";
 
 function html(cuerpo, status = 200) {
@@ -24,6 +24,9 @@ function leerFiltros(params) {
     departamento: texto(params.get("departamento"), 60),
     modalidad: Object.hasOwn(MODALIDADES, modalidad ?? "") ? modalidad : "",
     tipo: Object.hasOwn(TIPOS, tipo ?? "") ? tipo : "",
+    sueldo: params.get("sueldo") === "alto" ? "alto" : "",
+    cierre: params.get("cierre") === "pronto" ? "pronto" : "",
+    nuevas: params.get("nuevas") === "1" ? "1" : "",
   };
 }
 
@@ -36,11 +39,12 @@ async function listado(env, url, rubroFijo) {
   const filtros = leerFiltros(url.searchParams);
   if (rubroFijo) filtros.rubro = rubroFijo;
   const pagina = leerPagina(url.searchParams);
-  const [{ ofertas, total }, departamentos] = await Promise.all([
+  const [{ ofertas, total }, departamentos, atajos] = await Promise.all([
     listarOfertas(env.DB, filtros, pagina),
     listarDepartamentos(env.DB),
+    resumenAtajos(env.DB),
   ]);
-  return html(paginaListado({ filtros, rubroFijo, ofertas, total, pagina, departamentos }));
+  return html(paginaListado({ filtros, rubroFijo, ofertas, total, pagina, departamentos, atajos }));
 }
 
 async function enrutar(request, env, ctx, url) {
@@ -51,8 +55,12 @@ async function enrutar(request, env, ctx, url) {
   const ruta = url.pathname.replace(/\/+$/, "") || "/";
 
   if (ruta === "/") {
-    const [datos, departamentos] = await Promise.all([datosInicio(env.DB), listarDepartamentos(env.DB)]);
-    return html(paginaInicio({ ...datos, departamentos }));
+    const [datos, departamentos, atajos] = await Promise.all([
+      datosInicio(env.DB),
+      listarDepartamentos(env.DB),
+      resumenAtajos(env.DB),
+    ]);
+    return html(paginaInicio({ ...datos, departamentos, atajos }));
   }
 
   if (ruta === "/empleos") return listado(env, url);
