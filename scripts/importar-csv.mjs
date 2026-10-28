@@ -2,6 +2,10 @@
 //
 //   node scripts/importar-csv.mjs ofertas.csv > ofertas.sql
 //   node scripts/importar-csv.mjs ofertas.csv --sin-ejemplos > ofertas.sql
+//   node scripts/importar-csv.mjs ofertas.csv --reemplazar > ofertas.sql
+//
+// Con --reemplazar el archivo se toma como la lista completa: las ofertas
+// cargadas antes a mano que no vengan en él dejan de mostrarse.
 //
 // Cada oferta se identifica por su enlace: si el mismo enlace vuelve a venir en
 // otro CSV, se actualiza en lugar de duplicarse. Si el enlace es genérico (se
@@ -185,13 +189,17 @@ function salario(s) {
   return `S/ ${m[1]}${m[2] && m[2] !== ".00" ? m[2] : ""}`;
 }
 
-// Primer monto del texto, como número. null si no hay o si no es razonable
-// para un sueldo mensual (suelen ser errores como "S/ 001").
-function salarioNumero(s) {
+// Primer monto del texto, como número, o null si no trae monto.
+function primerMonto(s) {
   const m = s.match(/(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/);
-  if (!m) return null;
-  const n = Number(m[1].replace(/,/g, "") + (m[2] ?? ""));
-  return n >= 300 && n <= 30000 ? n : null;
+  return m ? Number(m[1].replace(/,/g, "") + (m[2] ?? "")) : null;
+}
+
+// Solo los montos de S/ 300 a S/ 30 000 cuentan como sueldo mensual para el
+// promedio. Montos menores pueden ser pagos por jornada (se muestran igual).
+function salarioNumero(s) {
+  const n = primerMonto(s);
+  return n !== null && n >= 300 && n <= 30000 ? n : null;
 }
 
 // Talento Perú publica el resumen como "Convocatoria <régimen>-<n.°> para
@@ -222,7 +230,7 @@ const sql = (v) => (v === "" || v === null || v === undefined ? "NULL" : `'${Str
 function principal() {
   const [ruta, ...opciones] = process.argv.slice(2);
   if (!ruta) {
-    console.error("Uso: node scripts/importar-csv.mjs archivo.csv [--sin-ejemplos] > salida.sql");
+    console.error("Uso: node scripts/importar-csv.mjs archivo.csv [--sin-ejemplos] [--reemplazar] > salida.sql");
     process.exit(1);
   }
   const [encabezados, ...filas] = parsearCsv(leerTexto(ruta));
@@ -284,7 +292,9 @@ function principal() {
       modalidad: elegir("modalidad", OPC_MODALIDADES, ""),
       tipo: elegir("tipo", OPC_TIPOS, ""),
       salario: salario(col(f, "salario")),
-      resumen: col(f, "resumen").slice(0, 400),
+      // Algunas fuentes empiezan el resumen con "<puesto> en <entidad>. ", que
+      // ya se muestra en la tarjeta.
+      resumen: col(f, "resumen").replace(`${titulo} en ${col(f, "empresa")}. `, "").slice(0, 400),
       url_postulacion: url,
       publicado_en: leerFecha("publicado_en", hoy),
       cierra_en: leerFecha("cierra_en", ""),
@@ -294,10 +304,13 @@ function principal() {
       fila.resumen = talento.resumen;
       if (!fila.tipo && talento.temporal) fila.tipo = "temporal";
     }
-    // Si el texto trae un monto pero no es razonable, no se muestra.
-    if (/\d/.test(fila.salario) && salarioNumero(fila.salario) === null) {
-      avisar(`salario "${fila.salario}" no parece un sueldo mensual; se deja vacío`, linea);
+    // Montos claramente errados (como "S/ 001" o "S/ 836,419") no se muestran.
+    const monto = primerMonto(fila.salario);
+    if (monto !== null && (monto < 50 || monto > 30000)) {
+      avisar(`salario "${fila.salario}" parece un error; se deja vacío`, linea);
       fila.salario = "";
+    } else if (monto !== null && monto < 300) {
+      avisar(`salario "${fila.salario}" se muestra pero no cuenta para el promedio mensual`, linea);
     }
     fila.texto_busqueda = textoBuscable(fila.titulo, fila.empresa, fila.ubicacion, fila.resumen);
     fila.salario_num = salarioNumero(fila.salario);
@@ -310,9 +323,14 @@ function principal() {
 
   // D1 limita el tamaño de cada sentencia, así que se inserta por lotes.
   const campos = ["fuente", "fuente_id", "titulo", "empresa", "ubicacion", "departamento", "rubro", "modalidad", "tipo", "salario", "resumen", "url_postulacion", "publicado_en", "cierra_en", "texto_busqueda", "salario_num"];
-  const actualizar = campos.filter((c) => !["fuente", "fuente_id"].includes(c)).map((c) => `${c} = excluded.${c}`);
+  // La fecha de publicación se queda con la más antigua: si el CSV no la trae,
+  // una oferta que ya estaba no vuelve a aparecer como nueva.
+  const actualizar = campos
+    .filter((c) => !["fuente", "fuente_id"].includes(c))
+    .map((c) => (c === "publicado_en" ? "publicado_en = min(ofertas.publicado_en, excluded.publicado_en)" : `${c} = excluded.${c}`));
   const salida = [];
   if (opciones.includes("--sin-ejemplos")) salida.push("DELETE FROM ofertas WHERE fuente = 'ejemplo';");
+  if (opciones.includes("--reemplazar")) salida.push("UPDATE ofertas SET activo = 0 WHERE fuente = 'manual';");
   for (let i = 0; i < valores.length; i += 100) {
     salida.push(
       `INSERT INTO ofertas (${campos.join(", ")}) VALUES\n${valores.slice(i, i + 100).join(",\n")}\n` +

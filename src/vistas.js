@@ -135,7 +135,10 @@ function notaAtajo(a, atajos) {
 // En la portada llevan al listado y muestran cuántas ofertas hay; en el
 // listado se activan o desactivan sobre los filtros actuales.
 function botonesAtajos({ atajos, base = "/empleos", filtros = null }) {
-  const botones = ATAJOS.map((a) => {
+  // Un atajo que incluiría todas las ofertas no filtra nada; se oculta salvo que
+  // ya esté activo (para poder quitarlo).
+  const visibles = ATAJOS.filter((a) => filtros?.[a.clave] || atajos[a.clave] < atajos.total);
+  const botones = visibles.map((a) => {
     const activo = filtros?.[a.clave];
     const href = filtros ? enlacePagina(base, { ...filtros, [a.clave]: activo ? "" : a.valor }, 1) : `/empleos?${a.clave}=${a.valor}`;
     const extra = filtros ? (activo ? ` <span aria-hidden="true">×</span>` : "") : ` <span class="atajo-n">${atajos[a.clave].toLocaleString("es-PE")}</span>`;

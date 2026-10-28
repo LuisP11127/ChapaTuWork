@@ -43,5 +43,7 @@ node scripts/importar-csv.mjs ofertas.csv > ofertas.sql
 ```
 
 El script avisa qué filas se omitieron o tienen valores que no reconoce.
-Con `--sin-ejemplos` además borra las ofertas de ejemplo. El SQL resultante se
+Con `--sin-ejemplos` además borra las ofertas de ejemplo. Con `--reemplazar`
+el archivo se toma como la lista completa: las ofertas cargadas antes que no
+vengan en él dejan de mostrarse. El SQL resultante se
 aplica a la base de datos D1 `chapatuwork`.

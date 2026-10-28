@@ -78,7 +78,7 @@ export async function datosInicio(db) {
 export function resumenAtajos(db) {
   return db
     .prepare(
-      `SELECT ${PROMEDIO} AS promedio,
+      `SELECT ${PROMEDIO} AS promedio, COUNT(*) AS total,
         COALESCE(SUM(CASE WHEN ${SUELDO_ALTO} THEN 1 ELSE 0 END), 0) AS sueldo,
         COALESCE(SUM(CASE WHEN ${CIERRA_PRONTO} THEN 1 ELSE 0 END), 0) AS cierre,
         COALESCE(SUM(CASE WHEN ${NUEVA} THEN 1 ELSE 0 END), 0) AS nuevas
