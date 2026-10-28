@@ -78,6 +78,11 @@ async function enrutar(request, env, ctx, url) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // Una sola dirección para el sitio: www.chapatuwork.com -> chapatuwork.com.
+    if (url.hostname === "www.chapatuwork.com") {
+      url.hostname = "chapatuwork.com";
+      return Response.redirect(url.toString(), 301);
+    }
     let respuesta;
     try {
       respuesta = await enrutar(request, env, ctx, url);

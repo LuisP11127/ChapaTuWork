@@ -3,7 +3,7 @@
 Portal de ofertas de trabajo en Perú, ordenadas por rubro. Cada oferta enlaza
 a su página original para postular.
 
-Corre como un solo Cloudflare Worker:
+Publicado en https://chapatuwork.com. Corre como un solo Cloudflare Worker:
 
 - `src/`: el Worker. Arma las páginas en el servidor y lee las ofertas de D1.
   - `index.js`: rutas (`/`, `/empleos`, `/rubro/:slug`, `/ir/:id`).
