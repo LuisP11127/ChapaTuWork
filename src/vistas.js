@@ -52,6 +52,8 @@ function tarjeta(o) {
   const lugar = [o.empresa, o.ubicacion ?? o.departamento].filter(Boolean).map(esc).join(" · ");
   const etiquetas = [MODALIDADES[o.modalidad], TIPOS[o.tipo], o.salario].filter(Boolean);
   const cierre = textoCierre(o.cierra_en);
+  // Talento Perú no tiene enlaces por convocatoria; el botón lleva a su buscador.
+  const boton = o.url_postulacion?.startsWith("https://app.servir.gob.pe/") ? "Buscar en Talento Perú" : "Más información";
   return `<article class="oferta">
   <div class="oferta-cab">
     <a class="rubro" href="/rubro/${rubro.slug}">${esc(rubro.nombre)}</a>
@@ -62,7 +64,7 @@ function tarjeta(o) {
   ${o.resumen ? `<p class="resumen">${esc(o.resumen)}</p>` : ""}
   <div class="oferta-pie">
     <ul class="etiquetas">${cierre ? `<li class="cierre${cierre.urgente ? " urgente" : ""}">${esc(cierre.texto)}</li>` : ""}${etiquetas.map((e) => `<li>${esc(e)}</li>`).join("")}${o.fuente === "ejemplo" ? `<li class="ejemplo">Ejemplo</li>` : ""}</ul>
-    <a class="boton" href="/ir/${o.id}" target="_blank" rel="noopener nofollow">Más información <span aria-hidden="true">↗</span></a>
+    <a class="boton" href="/ir/${o.id}" target="_blank" rel="noopener nofollow">${boton} <span aria-hidden="true">↗</span></a>
   </div>
 </article>`;
 }

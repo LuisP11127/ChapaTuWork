@@ -17,3 +17,6 @@ INSERT INTO ofertas (fuente, fuente_id, titulo, empresa, ubicacion, departamento
 ('ejemplo', '14', 'Abogado(a) laboralista', 'Estudio Jurídico Mendoza', 'Arequipa', 'Arequipa', 'legal', 'presencial', 'tiempo-completo', NULL, 'Asesoría a empresas en temas laborales y representación en procesos ante SUNAFIL.', 'https://example.com/ofertas/14', '2026-10-15T10:00:00Z'),
 ('ejemplo', '15', 'Ingeniero(a) de mantenimiento', 'Agroindustrias Ica', 'Ica', 'Ica', 'ingenieria', 'presencial', 'tiempo-completo', 'S/ 5,000', 'Planificación del mantenimiento preventivo de equipos de planta empacadora.', 'https://example.com/ofertas/15', '2026-10-12T09:00:00Z'),
 ('ejemplo', '16', 'Soporte técnico TI', 'Andes Software Lab', 'Lima', 'Lima', 'tecnologia', 'remoto', 'medio-tiempo', 'S/ 1,500', 'Atención de incidencias de usuarios, instalación de equipos y gestión de cuentas.', 'https://example.com/ofertas/16', '2026-10-08T11:00:00Z');
+
+UPDATE ofertas SET texto_busqueda = lower(titulo || ' ' || coalesce(empresa, '') || ' ' || coalesce(ubicacion, '') || ' ' || coalesce(resumen, ''))
+WHERE fuente = 'ejemplo';

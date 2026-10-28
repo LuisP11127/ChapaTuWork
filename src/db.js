@@ -1,3 +1,5 @@
+import { textoBuscable } from "./util.js";
+
 export const POR_PAGINA = 20;
 
 // Una oferta se muestra hasta su fecha de cierre (hora de Lima). Si no tiene
@@ -28,9 +30,9 @@ function condiciones(f) {
     params.push(f.tipo);
   }
   if (f.q) {
-    const like = `%${f.q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
-    cond.push("(titulo LIKE ? ESCAPE '\\' OR empresa LIKE ? ESCAPE '\\' OR resumen LIKE ? ESCAPE '\\')");
-    params.push(like, like, like);
+    const like = `%${textoBuscable(f.q).replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+    cond.push("texto_busqueda LIKE ? ESCAPE '\\'");
+    params.push(like);
   }
   return { where: cond.join(" AND "), params };
 }

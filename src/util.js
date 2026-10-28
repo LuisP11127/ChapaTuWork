@@ -20,6 +20,19 @@ export function haceCuanto(iso, ahora = Date.now()) {
   return fecha.toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Minúsculas, sin tildes y con espacios simples. Se usa para guardar y para
+// buscar, así "Médico" y "medico" coinciden.
+export function textoBuscable(...partes) {
+  return partes
+    .filter(Boolean)
+    .join(" ")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Fecha de hoy en Lima (UTC-5), como AAAA-MM-DD.
 export function hoyEnLima(ahora = Date.now()) {
   return new Date(ahora - 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
