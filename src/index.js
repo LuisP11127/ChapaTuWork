@@ -1,6 +1,19 @@
-import { MODALIDADES, TIPOS, buscarRubro } from "./catalogo.js";
-import { datosInicio, listarDepartamentos, listarOfertas, resumenAtajos, sumarClic, urlDeOferta } from "./db.js";
-import { pagina404, paginaError, paginaInicio, paginaListado } from "./vistas.js";
+import { MODALIDADES, RUBROS, TIPOS, buscarRubro } from "./catalogo.js";
+import {
+  datosInicio,
+  estadisticas,
+  listarDepartamentos,
+  listarOfertas,
+  registrarClic,
+  registrarVista,
+  resumenAtajos,
+  resumenSemanal,
+  sumarClic,
+  urlDeOferta,
+} from "./db.js";
+import { GUIAS, REVISION_GUIAS_ISO } from "./guias.js";
+import { hoyEnLima, normalizarOrigen } from "./util.js";
+import { pagina404, paginaError, paginaInicio, paginaListado, paginaPanel, paginaResumen } from "./vistas.js";
 
 // Las ofertas solo cambian al importar un archivo (y al pasar su fecha de
 // cierre), así que las páginas se guardan en la caché de Cloudflare. Sin esto,
@@ -60,18 +73,31 @@ function claveCache(url, prefijo = "") {
 
 // Datos que se repiten en todas las páginas (departamentos, atajos), guardados
 // en caché aparte para no recalcularlos en cada listado.
+// La caché es una ayuda: si falla, se sigue sin ella en vez de mostrar un error.
+async function buscarEnCache(clave) {
+  try {
+    return await caches.default.match(clave);
+  } catch (err) {
+    console.error(err);
+    return undefined;
+  }
+}
+
+function guardarEnCache(ctx, clave, respuesta) {
+  ctx.waitUntil(caches.default.put(clave, respuesta).catch((err) => console.error(err)));
+}
+
 async function enCache(ctx, url, nombre, calcular) {
   const clave = new Request(`${url.origin}/__datos/${nombre}`);
-  const guardado = await caches.default.match(clave);
+  const guardado = await buscarEnCache(clave);
   if (guardado) return guardado.json();
   const valor = await calcular();
-  ctx.waitUntil(
-    caches.default.put(
-      clave,
-      new Response(JSON.stringify(valor), {
-        headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${SEGUNDOS_PAGINA}` },
-      }),
-    ),
+  guardarEnCache(
+    ctx,
+    clave,
+    new Response(JSON.stringify(valor), {
+      headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${SEGUNDOS_PAGINA}` },
+    }),
   );
   return valor;
 }
@@ -94,12 +120,73 @@ async function listado(env, ctx, url, rubroFijo) {
   return html(paginaListado({ filtros, rubroFijo, ofertas, total, pagina, departamentos, atajos }));
 }
 
+function mapaDelSitio(url) {
+  const hoy = hoyEnLima();
+  const paginas = [
+    ["/", hoy],
+    ["/empleos", hoy],
+    ...RUBROS.map((r) => [`/rubro/${r.slug}`, hoy]),
+    ["/resumen-semanal", hoy],
+    ["/guias", REVISION_GUIAS_ISO],
+    ...GUIAS.map((g) => [`/guias/${g.slug}`, REVISION_GUIAS_ISO]),
+    ["/privacidad", REVISION_GUIAS_ISO],
+  ];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${paginas.map(([ruta, fecha]) => `  <url><loc>${url.origin}${ruta}</loc><lastmod>${fecha}</lastmod></url>`).join("\n")}
+</urlset>
+`;
+  return new Response(xml, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
+}
+
+// Compara sin cortar en el primer carácter distinto, para no dar pistas sobre la clave.
+function mismaClave(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  let distinto = 0;
+  for (let i = 0; i < a.length; i++) distinto |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return distinto === 0;
+}
+
+// Panel privado de estadísticas: /panel?clave=<PANEL_CLAVE>.
+async function panel(env, url) {
+  if (!mismaClave(url.searchParams.get("clave") ?? "", env.PANEL_CLAVE ?? "")) return html(pagina404(), 404);
+  const respuesta = html(paginaPanel(await estadisticas(env.DB)));
+  respuesta.headers.set("Cache-Control", "no-store");
+  respuesta.headers.set("X-Robots-Tag", "noindex");
+  return respuesta;
+}
+
+const ES_ROBOT = /bot|crawl|spider|slurp|headless|curl|wget|python|scanner|java\/|go-http|okhttp|axios/i;
+
+// Recibe los avisos de public/medicion.js. Responde siempre 204 para no dar
+// información a quien envíe datos inventados.
+async function medir(request, env) {
+  const vacio = new Response(null, { status: 204 });
+  if (ES_ROBOT.test(request.headers.get("User-Agent") ?? "")) return vacio;
+  const texto = await request.text();
+  if (texto.length > 1000) return vacio;
+  let datos;
+  try {
+    datos = JSON.parse(texto);
+  } catch {
+    return vacio;
+  }
+  const ruta = typeof datos?.r === "string" && /^\/[^\s]{0,199}$/.test(datos.r) ? datos.r : null;
+  if (!ruta) return vacio;
+  const origen = normalizarOrigen(datos.o);
+  if (datos.t === "vista") await registrarVista(env.DB, ruta, origen);
+  else if (datos.t === "clic" && Number.isInteger(datos.id) && datos.id > 0) await registrarClic(env.DB, ruta, origen, datos.id);
+  return vacio;
+}
+
 async function enrutar(request, env, ctx, url) {
+  const ruta = url.pathname.replace(/\/+$/, "") || "/";
+
+  if (ruta === "/medir" && request.method === "POST") return medir(request, env);
+
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Método no permitido", { status: 405, headers: { Allow: "GET, HEAD" } });
   }
-
-  const ruta = url.pathname.replace(/\/+$/, "") || "/";
 
   if (ruta === "/") {
     const [datos, [departamentos, atajos]] = await Promise.all([datosInicio(env.DB), datosComunes(env, ctx, url)]);
@@ -112,6 +199,14 @@ async function enrutar(request, env, ctx, url) {
   if (rubro) {
     return buscarRubro(rubro[1]) ? listado(env, ctx, url, rubro[1]) : html(pagina404(), 404);
   }
+
+  if (ruta === "/resumen-semanal") {
+    return html(paginaResumen({ ...(await resumenSemanal(env.DB)), hoy: hoyEnLima() }));
+  }
+
+  if (ruta === "/sitemap.xml") return mapaDelSitio(url);
+
+  if (ruta === "/panel") return panel(env, url);
 
   // Redirige al sitio de postulación y cuenta el clic.
   const ir = ruta.match(/^\/ir\/(\d+)$/);
@@ -128,12 +223,15 @@ async function enrutar(request, env, ctx, url) {
 
 async function responder(request, env, ctx, url) {
   // workers.dev no tiene caché; ahí cada visita consulta D1.
-  const usarCache = (request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/ir/") && !url.hostname.endsWith(".workers.dev");
+  const usarCache =
+    (request.method === "GET" || request.method === "HEAD") &&
+    !/^\/(ir\/|panel|medir)/.test(url.pathname) &&
+    !url.hostname.endsWith(".workers.dev");
   const clave = usarCache ? claveCache(url) : null;
   const claveRespaldo = usarCache ? claveCache(url, "/__respaldo") : null;
 
   if (clave) {
-    const guardada = await caches.default.match(clave);
+    const guardada = await buscarEnCache(clave);
     if (guardada) return guardada;
   }
 
@@ -142,7 +240,7 @@ async function responder(request, env, ctx, url) {
     respuesta = await enrutar(request, env, ctx, url);
   } catch (err) {
     console.error(err);
-    const respaldo = claveRespaldo && (await caches.default.match(claveRespaldo));
+    const respaldo = claveRespaldo && (await buscarEnCache(claveRespaldo));
     if (respaldo) return respaldo;
     return new Response(paginaError(), {
       status: 503,
@@ -153,13 +251,14 @@ async function responder(request, env, ctx, url) {
   if (!clave || (respuesta.status !== 200 && respuesta.status !== 404)) return respuesta;
 
   const cuerpo = await respuesta.text();
+  const tipo = respuesta.headers.get("Content-Type") ?? "text/html; charset=utf-8";
   const conCache = (segundos) =>
     new Response(cuerpo, {
       status: respuesta.status,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": `public, max-age=${segundos}` },
+      headers: { "Content-Type": tipo, "Cache-Control": `public, max-age=${segundos}` },
     });
-  ctx.waitUntil(caches.default.put(clave, conCache(SEGUNDOS_PAGINA)));
-  if (respuesta.status === 200) ctx.waitUntil(caches.default.put(claveRespaldo, conCache(SEGUNDOS_RESPALDO)));
+  guardarEnCache(ctx, clave, conCache(SEGUNDOS_PAGINA));
+  if (respuesta.status === 200) guardarEnCache(ctx, claveRespaldo, conCache(SEGUNDOS_RESPALDO));
   return conCache(SEGUNDOS_PAGINA);
 }
 

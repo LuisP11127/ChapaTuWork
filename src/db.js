@@ -101,3 +101,68 @@ export function urlDeOferta(db, id) {
 export function sumarClic(db, id) {
   return db.prepare("UPDATE ofertas SET clics = clics + 1 WHERE id = ?").bind(id).run();
 }
+
+// Resumen de los últimos 7 días: ofertas vigentes publicadas en ese periodo,
+// agrupadas por departamento y rubro, y las tres que cierran antes en cada
+// departamento.
+export async function resumenSemanal(db) {
+  const SEMANA = `${VIGENTE} AND publicado_en >= date('now', '-5 hours', '-6 days')`;
+  const [porRegion, proximas] = await db.batch([
+    db.prepare(
+      `SELECT COALESCE(departamento, '') AS departamento, rubro, COUNT(*) AS nuevas,
+        SUM(CASE WHEN cierra_en IS NOT NULL AND cierra_en <= date('now', '-5 hours', '+6 days') THEN 1 ELSE 0 END) AS cierran
+      FROM ofertas WHERE ${SEMANA}
+      GROUP BY 1, 2`,
+    ),
+    db.prepare(
+      `SELECT * FROM (
+        SELECT id, titulo, empresa, departamento, cierra_en, salario,
+          ROW_NUMBER() OVER (PARTITION BY departamento ORDER BY cierra_en ASC, id) AS n
+        FROM ofertas WHERE ${SEMANA} AND cierra_en IS NOT NULL AND departamento IS NOT NULL
+      ) WHERE n <= 3`,
+    ),
+  ]);
+  return { filas: porRegion.results, proximas: proximas.results };
+}
+
+// Medición de visitas y clics (ver public/medicion.js).
+export function registrarVista(db, ruta, origen) {
+  return db.prepare("INSERT INTO eventos (tipo, ruta, origen) VALUES ('vista', ?, ?)").bind(ruta, origen).run();
+}
+
+// Copia el título de la oferta para no perderlo si la oferta se borra. Si la
+// oferta no existe, no se registra nada.
+export function registrarClic(db, ruta, origen, ofertaId) {
+  return db
+    .prepare(
+      `INSERT INTO eventos (tipo, ruta, origen, oferta_id, oferta_titulo)
+      SELECT 'clic', ?, ?, id, titulo || COALESCE(' · ' || empresa, '') FROM ofertas WHERE id = ?`,
+    )
+    .bind(ruta, origen, ofertaId)
+    .run();
+}
+
+// Estadísticas de los últimos 30 días para el panel.
+export async function estadisticas(db) {
+  const DESDE = "creado_en >= date('now', '-30 days')";
+  const [porDia, porOrigen, ofertas, paginas] = await db.batch([
+    db.prepare(
+      `SELECT substr(datetime(creado_en, '-5 hours'), 1, 10) AS dia,
+        SUM(tipo = 'vista') AS vistas, SUM(tipo = 'clic') AS clics
+      FROM eventos WHERE ${DESDE} GROUP BY dia ORDER BY dia DESC`,
+    ),
+    db.prepare(
+      `SELECT origen, SUM(tipo = 'vista') AS vistas, SUM(tipo = 'clic') AS clics
+      FROM eventos WHERE ${DESDE} GROUP BY origen ORDER BY vistas DESC, clics DESC LIMIT 25`,
+    ),
+    db.prepare(
+      `SELECT oferta_id, oferta_titulo, COUNT(*) AS clics
+      FROM eventos WHERE tipo = 'clic' AND ${DESDE} GROUP BY oferta_id ORDER BY clics DESC LIMIT 25`,
+    ),
+    db.prepare(
+      `SELECT ruta, COUNT(*) AS vistas FROM eventos WHERE tipo = 'vista' AND ${DESDE}
+      GROUP BY ruta ORDER BY vistas DESC LIMIT 25`,
+    ),
+  ]);
+  return { porDia: porDia.results, porOrigen: porOrigen.results, ofertas: ofertas.results, paginas: paginas.results };
+}

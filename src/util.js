@@ -52,3 +52,24 @@ export function textoCierre(cierraEn, ahora = Date.now()) {
 export function plural(n, singular, pluralForma) {
   return `${n.toLocaleString("es-PE")} ${n === 1 ? singular : pluralForma}`;
 }
+
+// Agrupa los sitios de origen más comunes ("l.facebook.com" y
+// "m.facebook.com" cuentan como "facebook").
+const ORIGENES = [
+  [/(^|\.)google\./, "google"],
+  [/(^|\.)(facebook\.com|fb\.com|fb\.me|m\.me)$/, "facebook"],
+  [/(^|\.)instagram\.com$/, "instagram"],
+  [/whatsapp|(^|\.)wa\.me$/, "whatsapp"],
+  [/(^|\.)(t\.co|twitter\.com|x\.com)$/, "x"],
+  [/(^|\.)(linkedin\.com|lnkd\.in)$/, "linkedin"],
+  [/(^|\.)tiktok\.com$/, "tiktok"],
+  [/(^|\.)bing\.com$/, "bing"],
+  [/(^|\.)duckduckgo\.com$/, "duckduckgo"],
+  [/(^|\.)yahoo\./, "yahoo"],
+];
+
+export function normalizarOrigen(texto) {
+  const o = String(texto ?? "").toLowerCase().trim().replace(/^www\./, "");
+  if (!/^[a-z0-9._-]{1,80}$/.test(o)) return "desconocido";
+  return ORIGENES.find(([patron]) => patron.test(o))?.[1] ?? o;
+}

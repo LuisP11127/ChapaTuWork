@@ -1,8 +1,10 @@
 import { RUBROS, MODALIDADES, TIPOS, buscarRubro } from "./catalogo.js";
 import { POR_PAGINA } from "./db.js";
+import { GUIAS } from "./guias.js";
 import { esc, haceCuanto, plural, textoCierre } from "./util.js";
 
-function layout({ titulo, descripcion, cuerpo, hayEjemplos = false }) {
+// También la usa scripts/generar-paginas.mjs para las páginas estáticas (guías, privacidad).
+export function layout({ titulo, descripcion, cuerpo, hayEjemplos = false }) {
   const tituloCompleto = titulo ? `${titulo} · ChapaTuWork` : "ChapaTuWork · Ofertas de trabajo en Perú";
   return `<!doctype html>
 <html lang="es">
@@ -15,6 +17,7 @@ function layout({ titulo, descripcion, cuerpo, hayEjemplos = false }) {
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <meta name="theme-color" content="#d9480f">
   <link rel="stylesheet" href="/styles.css">
+  <script defer src="/medicion.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -23,6 +26,7 @@ function layout({ titulo, descripcion, cuerpo, hayEjemplos = false }) {
       <nav class="nav">
         <a href="/empleos">Empleos</a>
         <a href="/#rubros">Rubros</a>
+        <a href="/guias">Guías</a>
       </nav>
     </div>
   </header>
@@ -33,6 +37,7 @@ ${cuerpo}
   <footer class="pie">
     <div class="wrap">
       <p>ChapaTuWork reúne ofertas publicadas en otros sitios. Para postular, te llevamos a la página original de cada oferta.</p>
+      <p class="pie-enlaces"><a href="/guias">Guías</a> · <a href="/resumen-semanal">Resumen semanal</a> · <a href="/privacidad">Privacidad</a></p>
       <p>© ${new Date().getFullYear()} ChapaTuWork</p>
     </div>
   </footer>
@@ -102,6 +107,17 @@ export function paginaInicio({ conteo, total, recientes, departamentos, atajos }
   <section class="wrap seccion" id="rubros">
     <h2>Rubros</h2>
     <div class="rubros">${rubros}</div>
+  </section>
+
+  <section class="wrap seccion">
+    <div class="seccion-cab">
+      <h2>Guías para postular</h2>
+      <a href="/guias">Ver todas</a>
+    </div>
+    <div class="guias">
+      ${GUIAS.map((g) => `<a class="guia-card" href="/guias/${g.slug}"><span class="guia-titulo">${esc(g.titulo)}</span><span class="guia-desc">${esc(g.descripcion)}</span></a>`).join("")}
+      <a class="guia-card" href="/resumen-semanal"><span class="guia-titulo">Resumen semanal de convocatorias por región</span><span class="guia-desc">Ofertas nuevas de los últimos 7 días en cada departamento y las que cierran pronto.</span></a>
+    </div>
   </section>
 
   <section class="wrap seccion">
@@ -240,5 +256,111 @@ export function paginaError() {
   return layout({
     titulo: "Error",
     cuerpo: `<div class="wrap mensaje"><h1>Algo salió mal</h1><p>Intenta de nuevo en unos minutos.</p></div>`,
+  });
+}
+
+function fechaCorta(d) {
+  return d.toLocaleDateString("es-PE", { day: "numeric", month: "long", timeZone: "UTC" });
+}
+
+// filas: [{ departamento, rubro, nuevas, cierran }]; proximas: hasta 3 ofertas por departamento.
+export function paginaResumen({ filas, proximas, hoy }) {
+  const fin = new Date(`${hoy}T12:00:00Z`);
+  const inicio = new Date(fin.getTime() - 6 * 24 * 60 * 60 * 1000);
+  const periodo = `del ${fechaCorta(inicio)} al ${fechaCorta(fin)}`;
+
+  const regiones = new Map();
+  for (const f of filas) {
+    const nombre = f.departamento || "Sin departamento indicado";
+    const r = regiones.get(nombre) ?? { nombre, departamento: f.departamento, nuevas: 0, cierran: 0, rubros: [] };
+    r.nuevas += f.nuevas;
+    r.cierran += f.cierran;
+    r.rubros.push({ rubro: buscarRubro(f.rubro) ?? buscarRubro("otros"), n: f.nuevas });
+    regiones.set(nombre, r);
+  }
+  // Las ofertas sin departamento van al final.
+  const lista = [...regiones.values()].sort((a, b) => (!a.departamento - !b.departamento) || b.nuevas - a.nuevas);
+  const total = lista.reduce((s, r) => s + r.nuevas, 0);
+
+  let cuerpo;
+  if (!total) {
+    cuerpo = `<p class="vacio-msg">No hay convocatorias nuevas en los últimos 7 días (${periodo}). Vuelve pronto: el resumen se actualiza solo cuando se publican ofertas.</p>`;
+  } else {
+    const destacadas = lista
+      .filter((r) => r.departamento)
+      .slice(0, 3)
+      .map((r) => `${esc(r.nombre)} (${r.nuevas.toLocaleString("es-PE")})`);
+    const intro = `<p class="entrada">${periodo[0].toUpperCase() + periodo.slice(1)} se publicaron ${plural(total, "oferta nueva", "ofertas nuevas")} que siguen abiertas${destacadas.length ? `. Los departamentos con más ofertas fueron ${destacadas.join(", ").replace(/, ([^,]*)$/, " y $1")}` : ""}.</p>`;
+    const secciones = lista.map((r) => {
+      const rubros = r.rubros
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 4)
+        .map((x) => `${esc(x.rubro.nombre)} (${x.n})`)
+        .join(", ");
+      const cierran = proximas.filter((p) => p.departamento === r.departamento);
+      const enlace = r.departamento ? `/empleos?departamento=${encodeURIComponent(r.departamento)}` : "/empleos";
+      return `<section class="region" id="${esc(textoAncla(r.nombre))}">
+      <h2>${esc(r.nombre)}</h2>
+      <p class="cifras">${plural(r.nuevas, "oferta nueva", "ofertas nuevas")} · ${plural(r.cierran, "cierra", "cierran")} en los próximos 7 días</p>
+      <p>Rubros con más ofertas: ${rubros}.</p>
+      ${
+        cierran.length
+          ? `<p>Cierran primero:</p><ul>${cierran
+              .map((p) => `<li><a href="/ir/${p.id}" rel="nofollow noopener" target="_blank">${esc(p.titulo)}</a>${p.empresa ? ` · ${esc(p.empresa)}` : ""} · ${esc(textoCierre(p.cierra_en)?.texto ?? "")}</li>`)
+              .join("")}</ul>`
+          : ""
+      }
+      <p><a href="${esc(enlace)}">Ver todas las ofertas${r.departamento ? ` en ${esc(r.nombre)}` : ""}</a></p>
+    </section>`;
+    });
+    cuerpo = intro + secciones.join("\n");
+  }
+
+  return layout({
+    titulo: "Resumen semanal de convocatorias por región",
+    descripcion: "Ofertas de trabajo nuevas de los últimos 7 días en cada departamento del Perú, por rubro, y las que cierran pronto.",
+    cuerpo: `
+  <div class="wrap articulo">
+    <p class="migas"><a href="/guias">Guías</a> /</p>
+    <h1>Resumen semanal de convocatorias por región</h1>
+    <p class="revision">Últimos 7 días: ${periodo}. Se actualiza solo con cada publicación.</p>
+    ${cuerpo}
+  </div>`,
+  });
+}
+
+function textoAncla(s) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function tablaSimple(encabezados, filas) {
+  if (!filas.length) return `<p class="vacio-msg">Todavía no hay datos.</p>`;
+  return `<div class="tabla-envoltura"><table><thead><tr>${encabezados.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${filas
+    .map((f) => `<tr>${f.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`)
+    .join("")}</tbody></table></div>`;
+}
+
+export function paginaPanel({ porDia, porOrigen, ofertas, paginas }) {
+  const vistas = porDia.reduce((s, d) => s + d.vistas, 0);
+  const clics = porDia.reduce((s, d) => s + d.clics, 0);
+  return layout({
+    titulo: "Estadísticas",
+    cuerpo: `
+  <div class="wrap articulo panel">
+    <h1>Estadísticas de los últimos 30 días</h1>
+    <p class="revision">Solo cuentan navegadores reales: los robots que no ejecutan JavaScript no aparecen. Los días están en hora de Lima.</p>
+    <div class="cifras-grandes">
+      <div class="cifra"><b>${vistas.toLocaleString("es-PE")}</b>páginas vistas</div>
+      <div class="cifra"><b>${clics.toLocaleString("es-PE")}</b>clics en ofertas</div>
+    </div>
+    <h2>De dónde llegan las visitas</h2>
+    ${tablaSimple(["Origen", "Páginas vistas", "Clics en ofertas"], porOrigen.map((o) => [o.origen, o.vistas, o.clics]))}
+    <h2>Ofertas con más clics</h2>
+    ${tablaSimple(["Oferta", "Clics"], ofertas.map((o) => [o.oferta_titulo ?? `Oferta ${o.oferta_id}`, o.clics]))}
+    <h2>Páginas más vistas</h2>
+    ${tablaSimple(["Página", "Vistas"], paginas.map((p) => [p.ruta, p.vistas]))}
+    <h2>Por día</h2>
+    ${tablaSimple(["Día", "Páginas vistas", "Clics"], porDia.map((d) => [d.dia, d.vistas, d.clics]))}
+  </div>`,
   });
 }

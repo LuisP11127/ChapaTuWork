@@ -1,6 +1,10 @@
-# Las páginas con filtros (?...) y los enlaces de salida (/ir/) no necesitan
-# rastrearse: son combinaciones de las mismas ofertas.
+# Las páginas con filtros (?...), los enlaces de salida (/ir/) y el panel no
+# necesitan rastrearse.
 User-agent: *
 Disallow: /ir/
+Disallow: /panel
+Disallow: /medir
 Disallow: /*?
 Allow: /
+
+Sitemap: https://chapatuwork.com/sitemap.xml

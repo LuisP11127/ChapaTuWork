@@ -431,3 +431,167 @@ button:hover, .boton:hover { filter: brightness(1.08); }
 }
 
 .pie p { margin: 4px 0; }
+
+/* Guías y páginas de texto */
+
+.articulo {
+  max-width: 760px;
+  padding-top: 32px;
+  line-height: 1.7;
+}
+
+.articulo h1 {
+  font-size: clamp(1.7rem, 4.5vw, 2.2rem);
+  letter-spacing: -0.015em;
+}
+
+.articulo h2 { font-size: 1.3rem; margin: 36px 0 8px; }
+
+.articulo h3 { font-size: 1.1rem; margin: 24px 0 8px; }
+
+.articulo ul, .articulo ol { padding-left: 1.3em; }
+
+.articulo li { margin: 6px 0; }
+
+.articulo .entrada { font-size: 1.1rem; color: var(--suave); }
+
+.revision { margin: 6px 0 20px; color: var(--suave); font-size: 0.9rem; }
+
+.aviso-legal {
+  margin-top: 32px;
+  padding: 12px 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  color: var(--suave);
+  font-size: 0.9rem;
+}
+
+.fuentes { margin-top: 36px; font-size: 0.9rem; }
+
+.fuentes a { word-break: break-word; }
+
+.tabla-envoltura {
+  overflow-x: auto;
+  margin: 12px 0;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.articulo table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  background: var(--superficie);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.articulo th, .articulo td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--borde);
+  text-align: left;
+  vertical-align: top;
+}
+
+.articulo tbody th { font-weight: 600; white-space: nowrap; }
+
+.comparacion {
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.comparacion p { margin: 4px 0; }
+
+.etiqueta-mal, .etiqueta-bien {
+  display: inline-block;
+  min-width: 56px;
+  margin-right: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.etiqueta-mal { color: var(--suave); }
+
+.etiqueta-bien { color: var(--acento); }
+
+.guias {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 720px) {
+  .guias { grid-template-columns: 1fr 1fr; }
+}
+
+.guia-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  color: var(--texto);
+  text-decoration: none;
+  line-height: 1.45;
+}
+
+.guia-card:hover { border-color: var(--acento); }
+
+.guia-titulo { font-weight: 600; }
+
+.guia-desc { color: var(--suave); font-size: 0.92rem; }
+
+.relacionadas { margin-top: 40px; }
+
+.pie-enlaces a { color: var(--suave); }
+
+/* Resumen semanal */
+
+.region {
+  margin-top: 16px;
+  padding: 16px 18px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.region h2 { margin: 0 0 4px; font-size: 1.15rem; }
+
+.region .cifras { margin: 0; color: var(--suave); }
+
+.region ul { margin: 8px 0; }
+
+/* Panel de estadísticas */
+
+.panel table { min-width: 0; }
+
+.panel .cifras-grandes {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.panel .cifra {
+  padding: 14px 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.panel .cifra b { display: block; font-size: 1.6rem; }
+
+/* En pantallas angostas el logo y los tres enlaces del menú deben caber en una línea. */
+@media (max-width: 440px) {
+  .topbar-in { gap: 12px; }
+  .logo { font-size: 1.05rem; gap: 6px; }
+  .logo img { width: 26px; height: 26px; }
+  .nav { gap: 10px; }
+  .nav a { font-size: 0.9rem; }
+}
