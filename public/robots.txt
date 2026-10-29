@@ -1,0 +1,6 @@
+# Las páginas con filtros (?...) y los enlaces de salida (/ir/) no necesitan
+# rastrearse: son combinaciones de las mismas ofertas.
+User-agent: *
+Disallow: /ir/
+Disallow: /*?
+Allow: /
